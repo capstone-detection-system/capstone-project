@@ -2,7 +2,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Annotated
+from typing import Any
 
+from pydantic import BaseModel, Field
+
+from genai_service import (
+    generate_detection_analysis
+)
 import tensorflow as tf
 from fastapi import (
     FastAPI,
@@ -92,6 +98,43 @@ app = FastAPI(
 )
 
 
+# ============================================================
+# GENERATIVE AI REQUEST SCHEMA
+# ============================================================
+
+class DetectionAnalysisRequest(BaseModel):
+    prediction: str = Field(
+        pattern="^(real|fake)$"
+    )
+
+    threshold: float = Field(
+        ge=0.0,
+        le=1.0
+    )
+
+    total_clips: int = Field(
+        ge=1
+    )
+
+    real_clips: int = Field(
+        ge=0
+    )
+
+    fake_clips: int = Field(
+        ge=0
+    )
+
+    average_probability_real: float = Field(
+        ge=0.0,
+        le=1.0
+    )
+
+    average_probability_fake: float = Field(
+        ge=0.0,
+        le=1.0
+    )
+
+    
 # ============================================================
 # ROUTES
 # ============================================================
@@ -231,3 +274,59 @@ async def predict(
             and temp_path.exists()
         ):
             temp_path.unlink()
+
+
+# ============================================================
+# GENERATIVE AI ANALYSIS ENDPOINT
+# ============================================================
+
+@app.post("/generate-analysis")
+def generate_analysis(
+    request: DetectionAnalysisRequest
+):
+    """
+    Membuat penjelasan hasil prediksi menggunakan Gemini API.
+
+    Endpoint ini merupakan fitur sekunder.
+    Label prediksi tetap berasal dari model TensorFlow.
+    """
+
+    if (
+        request.real_clips
+        + request.fake_clips
+        != request.total_clips
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Jumlah real_clips dan fake_clips "
+                "harus sama dengan total_clips."
+            )
+        )
+
+    try:
+        analysis = generate_detection_analysis(
+            detection_result=(
+                request.model_dump()
+            )
+        )
+
+        return {
+            "prediction": request.prediction,
+            "analysis": analysis
+        }
+
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=str(error)
+        ) from error
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Gagal membuat analisis AI: "
+                f"{str(error)}"
+            )
+        ) from error
