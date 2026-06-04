@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>AudioCaps Detector V2</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f3f4f6;
+            color: #1f2937;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            margin-top: 0;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .api-info {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            background: #e0f2fe;
+            border: 1px solid #bae6fd;
+            line-height: 1.5;
+        }
+
+        .api-info a {
+            color: #0369a1;
+            font-weight: bold;
+        }
+
+        .card {
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .card h2 {
+            margin-top: 0;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input[type="file"],
+        input[type="number"] {
+            width: 100%;
+            padding: 11px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: white;
+        }
+
+        button {
+            padding: 11px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            background: #9ca3af;
+        }
+
+        .generate-button {
+            margin-top: 8px;
+            background: #059669;
+        }
+
+        .generate-button:hover {
+            background: #047857;
+        }
+
+        .status {
+            margin-top: 14px;
+            font-weight: bold;
+            line-height: 1.5;
+        }
+
+        .success {
+            color: #059669;
+        }
+
+        .error {
+            color: #dc2626;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(
+                auto-fit,
+                minmax(170px, 1fr)
+            );
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .summary-item {
+            padding: 14px;
+            border-radius: 10px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+        }
+
+        .summary-label {
+            margin-bottom: 6px;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .summary-value {
+            font-size: 19px;
+            font-weight: bold;
+            word-break: break-word;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 7px 12px;
+            border-radius: 999px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .badge-real {
+            background: #059669;
+        }
+
+        .badge-fake {
+            background: #dc2626;
+        }
+
+        .json-title {
+            margin-top: 22px;
+        }
+
+        pre {
+            overflow-x: auto;
+            max-height: 520px;
+            padding: 16px;
+            border-radius: 10px;
+            background: #111827;
+            color: #e5e7eb;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .analysis-box {
+            padding: 16px;
+            border-radius: 10px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+        }
+
+        .analysis-box h3 {
+            margin-top: 18px;
+        }
+
+        .analysis-box h3:first-child {
+            margin-top: 0;
+        }
+
+        .analysis-box p,
+        .analysis-box li {
+            line-height: 1.6;
+        }
+
+        .disclaimer {
+            margin-top: 16px;
+            padding: 14px;
+            border-radius: 8px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+        }
+
+        .small-note {
+            margin-top: 7px;
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AudioCaps Detector V2</h1>
+
+            <p>
+                Aplikasi sederhana untuk mendeteksi indikasi deepfake
+                audio. File audio akan dipotong menjadi beberapa clip
+                berdurasi 2 detik. Setiap clip dianalisis oleh model,
+                lalu hasil akhir ditentukan berdasarkan mayoritas suara.
+            </p>
+
+            <div class="api-info">
+                <strong>Backend API:</strong>
+
+                <a
+                    href="https://syahhh01-audiocapsdetectorv2.hf.space/docs"
+                    target="_blank"
+                >
+                    Buka Swagger Hugging Face
+                </a>
+            </div>
+        </div>
+
+        <!-- ================================================= -->
+        <!-- UPLOAD AUDIO -->
+        <!-- ================================================= -->
+
+        <div class="card">
+            <h2>1. Upload Audio</h2>
+
+            <form id="prediction-form">
+                <div class="form-group">
+                    <label for="audio-file">
+                        Pilih file audio
+                    </label>
+
+                    <input
+                        id="audio-file"
+                        name="file"
+                        type="file"
+                        accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="threshold">
+                        Threshold probabilitas fake
+                    </label>
+
+                    <input
+                        id="threshold"
+                        name="threshold"
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value="0.60"
+                        required
+                    >
+
+                    <div class="small-note">
+                        Setiap clip dianggap fake jika nilai
+                        probability_fake lebih besar atau sama dengan
+                        threshold. Nilai default: 0.60.
+                    </div>
+                </div>
+
+                <button
+                    id="predict-button"
+                    type="submit"
+                >
+                    Analisis Audio
+                </button>
+            </form>
+
+            <div
+                id="prediction-status"
+                class="status"
+            ></div>
+        </div>
+
+        <!-- ================================================= -->
+        <!-- HASIL PREDIKSI -->
+        <!-- ================================================= -->
+
+        <div
+            id="prediction-card"
+            class="card hidden"
+        >
+            <h2>2. Hasil Prediksi Model</h2>
+
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Hasil Prediksi
+                    </div>
+
+                    <div class="summary-value">
+                        <span
+                            id="prediction-badge"
+                            class="badge"
+                        ></span>
+                    </div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Nama File
+                    </div>
+
+                    <div
+                        id="filename"
+                        class="summary-value"
+                    ></div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Threshold
+                    </div>
+
+                    <div
+                        id="result-threshold"
+                        class="summary-value"
+                    ></div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Metode Keputusan
+                    </div>
+
+                    <div
+                        id="decision-method"
+                        class="summary-value"
+                    ></div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Durasi per Clip
+                    </div>
+
+                    <div
+                        id="clip-duration"
+                        class="summary-value"
+                    ></div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Total Clip
+                    </div>
+
+                    <div
+                        id="total-clips"
+                        class="summary-value"
+                    ></div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Clip Real
+                    </div>
+
+                    <div
+                        id="real-clips"
+                        class="summary-value"
+                    ></div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Clip Fake
+                    </div>
+
+                    <div
+                        id="fake-clips"
+                        class="summary-value"
+                    ></div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Rata-rata Probabilitas Real
+                    </div>
+
+                    <div
+                        id="average-probability-real"
+                        class="summary-value"
+                    ></div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        Rata-rata Probabilitas Fake
+                    </div>
+
+                    <div
+                        id="average-probability-fake"
+                        class="summary-value"
+                    ></div>
+                </div>
+            </div>
+
+            <button
+                id="generate-analysis-button"
+                class="generate-button"
+                type="button"
+            >
+                Generate Laporan AI
+            </button>
+
+            <div
+                id="analysis-status"
+                class="status"
+            ></div>
+
+            <h3 class="json-title">
+                JSON Hasil Prediksi Lengkap
+            </h3>
+
+            <pre id="prediction-json"></pre>
+        </div>
+
+        <!-- ================================================= -->
+        <!-- LAPORAN GENERATIVE AI -->
+        <!-- ================================================= -->
+
+        <div
+            id="analysis-card"
+            class="card hidden"
+        >
+            <h2>3. Laporan AI Analysis Assistant</h2>
+
+            <div class="analysis-box">
+                <h3>Ringkasan</h3>
+
+                <p id="analysis-summary"></p>
+
+                <h3>Rekomendasi</h3>
+
+                <ul id="analysis-recommendations"></ul>
+
+                <div class="disclaimer">
+                    <strong>Disclaimer:</strong>
+
+                    <span id="analysis-disclaimer"></span>
+                </div>
+            </div>
+
+            <h3 class="json-title">
+                JSON Laporan Lengkap
+            </h3>
+
+            <pre id="analysis-json"></pre>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================
+        // HUGGING FACE BACKEND URL
+        // =====================================================
+
+        const API_BASE_URL =
+            "https://syahhh01-audiocapsdetectorv2.hf.space/";
+
+
+        let latestPredictionResult = null;
+
+
+        const predictionForm = document.getElementById(
+            "prediction-form"
+        );
+
+        const predictButton = document.getElementById(
+            "predict-button"
+        );
+
+        const predictionStatus = document.getElementById(
+            "prediction-status"
+        );
+
+        const predictionCard = document.getElementById(
+            "prediction-card"
+        );
+
+        const generateAnalysisButton = document.getElementById(
+            "generate-analysis-button"
+        );
+
+        const analysisStatus = document.getElementById(
+            "analysis-status"
+        );
+
+        const analysisCard = document.getElementById(
+            "analysis-card"
+        );
+
+
+        // =====================================================
+        // POST /predict
+        // =====================================================
+
+        predictionForm.addEventListener(
+            "submit",
+            async function (event) {
+                event.preventDefault();
+
+                const audioFile = document.getElementById(
+                    "audio-file"
+                ).files[0];
+
+                const threshold = document.getElementById(
+                    "threshold"
+                ).value;
+
+                if (!audioFile) {
+                    setStatus(
+                        predictionStatus,
+                        "Silakan pilih file audio terlebih dahulu.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+                const formData = new FormData();
+
+                formData.append(
+                    "file",
+                    audioFile
+                );
+
+                formData.append(
+                    "threshold",
+                    threshold
+                );
+
+                predictButton.disabled = true;
+                generateAnalysisButton.disabled = true;
+
+                predictionCard.classList.add(
+                    "hidden"
+                );
+
+                analysisCard.classList.add(
+                    "hidden"
+                );
+
+                latestPredictionResult = null;
+
+                setStatus(
+                    predictionStatus,
+                    "Audio sedang dianalisis. Mohon tunggu...",
+                    ""
+                );
+
+                try {
+                    const response = await fetch(
+                        `${API_BASE_URL}/predict`,
+                        {
+                            method: "POST",
+                            body: formData
+                        }
+                    );
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            getErrorMessage(
+                                result,
+                                "Inference gagal."
+                            )
+                        );
+                    }
+
+                    latestPredictionResult = result;
+
+                    renderPrediction(
+                        result
+                    );
+
+                    setStatus(
+                        predictionStatus,
+                        "Analisis audio berhasil.",
+                        "success"
+                    );
+
+                    generateAnalysisButton.disabled = false;
+
+                } catch (error) {
+                    setStatus(
+                        predictionStatus,
+                        `Error: ${error.message}`,
+                        "error"
+                    );
+
+                } finally {
+                    predictButton.disabled = false;
+                }
+            }
+        );
+
+
+        // =====================================================
+        // POST /generate-analysis
+        // =====================================================
+
+        generateAnalysisButton.addEventListener(
+            "click",
+            async function () {
+                if (!latestPredictionResult) {
+                    setStatus(
+                        analysisStatus,
+                        "Belum ada hasil prediksi.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+                const requestBody = {
+                    prediction:
+                        latestPredictionResult.prediction,
+
+                    threshold:
+                        latestPredictionResult.threshold,
+
+                    total_clips:
+                        latestPredictionResult.total_clips,
+
+                    real_clips:
+                        latestPredictionResult.real_clips,
+
+                    fake_clips:
+                        latestPredictionResult.fake_clips,
+
+                    average_probability_real:
+                        latestPredictionResult
+                            .average_probability_real,
+
+                    average_probability_fake:
+                        latestPredictionResult
+                            .average_probability_fake
+                };
+
+                generateAnalysisButton.disabled = true;
+
+                analysisCard.classList.add(
+                    "hidden"
+                );
+
+                setStatus(
+                    analysisStatus,
+                    "Laporan AI sedang dibuat. Mohon tunggu...",
+                    ""
+                );
+
+                try {
+                    const response = await fetch(
+                        `${API_BASE_URL}/generate-analysis`,
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body: JSON.stringify(
+                                requestBody
+                            )
+                        }
+                    );
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            getErrorMessage(
+                                result,
+                                "Gagal membuat laporan AI."
+                            )
+                        );
+                    }
+
+                    renderAnalysis(
+                        result
+                    );
+
+                    setStatus(
+                        analysisStatus,
+                        "Laporan AI berhasil dibuat.",
+                        "success"
+                    );
+
+                } catch (error) {
+                    setStatus(
+                        analysisStatus,
+                        `Error: ${error.message}`,
+                        "error"
+                    );
+
+                } finally {
+                    generateAnalysisButton.disabled = false;
+                }
+            }
+        );
+
+
+        // =====================================================
+        // RENDER HASIL PREDIKSI
+        // =====================================================
+
+        function renderPrediction(result) {
+            const predictionBadge = document.getElementById(
+                "prediction-badge"
+            );
+
+            predictionBadge.textContent =
+                result.prediction.toUpperCase();
+
+            predictionBadge.className =
+                result.prediction === "fake"
+                    ? "badge badge-fake"
+                    : "badge badge-real";
+
+            document.getElementById(
+                "filename"
+            ).textContent = result.filename ?? "-";
+
+            document.getElementById(
+                "result-threshold"
+            ).textContent = result.threshold ?? "-";
+
+            document.getElementById(
+                "decision-method"
+            ).textContent = result.decision_method ?? "-";
+
+            document.getElementById(
+                "clip-duration"
+            ).textContent =
+                result.clip_duration_seconds !== undefined
+                    ? `${result.clip_duration_seconds} detik`
+                    : "-";
+
+            document.getElementById(
+                "total-clips"
+            ).textContent = result.total_clips ?? "-";
+
+            document.getElementById(
+                "real-clips"
+            ).textContent = result.real_clips ?? "-";
+
+            document.getElementById(
+                "fake-clips"
+            ).textContent = result.fake_clips ?? "-";
+
+            document.getElementById(
+                "average-probability-real"
+            ).textContent = formatProbability(
+                result.average_probability_real
+            );
+
+            document.getElementById(
+                "average-probability-fake"
+            ).textContent = formatProbability(
+                result.average_probability_fake
+            );
+
+            document.getElementById(
+                "prediction-json"
+            ).textContent = JSON.stringify(
+                result,
+                null,
+                2
+            );
+
+            predictionCard.classList.remove(
+                "hidden"
+            );
+        }
+
+
+        // =====================================================
+        // RENDER LAPORAN AI
+        // =====================================================
+
+        function renderAnalysis(result) {
+            const analysis = result.analysis;
+
+            document.getElementById(
+                "analysis-summary"
+            ).textContent =
+                analysis.summary ?? "-";
+
+            const recommendationList = document.getElementById(
+                "analysis-recommendations"
+            );
+
+            recommendationList.innerHTML = "";
+
+            const recommendations =
+                analysis.recommendation ?? [];
+
+            for (
+                const recommendation
+                of recommendations
+            ) {
+                const listItem = document.createElement(
+                    "li"
+                );
+
+                listItem.textContent = recommendation;
+
+                recommendationList.appendChild(
+                    listItem
+                );
+            }
+
+            document.getElementById(
+                "analysis-disclaimer"
+            ).textContent =
+                analysis.disclaimer ?? "-";
+
+            document.getElementById(
+                "analysis-json"
+            ).textContent = JSON.stringify(
+                result,
+                null,
+                2
+            );
+
+            analysisCard.classList.remove(
+                "hidden"
+            );
+        }
+
+
+        // =====================================================
+        // HELPER FUNCTIONS
+        // =====================================================
+
+        function formatProbability(value) {
+            if (
+                value === undefined
+                || value === null
+            ) {
+                return "-";
+            }
+
+            return `${(value * 100).toFixed(2)}%`;
+        }
+
+
+        function setStatus(
+            element,
+            message,
+            type
+        ) {
+            element.textContent = message;
+
+            element.className =
+                `status ${type}`;
+        }
+
+
+        function getErrorMessage(
+            result,
+            defaultMessage
+        ) {
+            if (!result) {
+                return defaultMessage;
+            }
+
+            if (typeof result.detail === "string") {
+                return result.detail;
+            }
+
+            if (Array.isArray(result.detail)) {
+                return result.detail
+                    .map(
+                        item => item.msg
+                    )
+                    .join(", ");
+            }
+
+            return defaultMessage;
+        }
+    </script>
+</body>
+</html>
