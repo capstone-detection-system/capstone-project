@@ -5,7 +5,7 @@ const { predictAudio,getPredictions,getPredictionById, } = require("../controlle
 
 router.post(
   "/predict",
-  upload.single("file"),
+  upload.single("audio"),
   predictAudio
 );
 

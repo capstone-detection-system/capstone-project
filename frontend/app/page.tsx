@@ -8,9 +8,66 @@ export default function HomePage() {
 
   const [isRecording, setIsRecording] = useState(false);
   const [audioURL, setAudioURL] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<any>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+
+  // HANDLE FILE CHANGE
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+      setAudioURL(URL.createObjectURL(e.target.files[0]));
+      setResult(null);
+    }
+  };
+
+  // HANDLE ANALYZE
+  const handleAnalyze = async () => {
+    let fileToUpload = selectedFile;
+
+    // If in record tab and there's a recording
+    if (activeTab === "record" && audioURL) {
+      const response = await fetch(audioURL);
+      const blob = await response.blob();
+      fileToUpload = new File([blob], "recording.wav", { type: "audio/wav" });
+    }
+
+    if (!fileToUpload) {
+      alert("Silakan pilih file atau rekam suara terlebih dahulu.");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setResult(null);
+
+    const formData = new FormData();
+    formData.append("audio", fileToUpload);
+
+    try {
+      const response = await fetch(`${API_URL}/predict`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        setResult(data);
+      } else {
+        alert("Gagal menganalisis audio: " + data.message);
+      }
+    } catch (error) {
+      console.error("Error analyzing audio:", error);
+      alert("Terjadi kesalahan saat menghubungi server.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   // START RECORD
   const startRecording = async () => {
@@ -39,6 +96,7 @@ export default function HomePage() {
         const url = URL.createObjectURL(audioBlob);
 
         setAudioURL(url);
+        setResult(null);
 
         // stop microphone stream
         stream.getTracks().forEach((track) => track.stop());
@@ -76,8 +134,8 @@ export default function HomePage() {
 
         <div className="nav-right">
           <div className="status">
-            <span className="dot"></span>
-            Offline
+            <span className="dot" style={{ backgroundColor: result ? "#10b981" : "#6b7280" }}></span>
+            {result ? "Online" : "Offline"}
           </div>
 
           <button
@@ -107,13 +165,15 @@ export default function HomePage() {
           dalam hitungan detik.
         </p>
 
-        <button className="hero-btn">
+        <button className="hero-btn" onClick={() => {
+          document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' });
+        }}>
           ▶ Mulai Deteksi
         </button>
       </section>
 
       {/* UPLOAD */}
-      <section className="upload-wrapper">
+      <section id="upload-section" className="upload-wrapper">
         <div className="upload-card">
           {/* TABS */}
           <div className="tabs">
@@ -123,7 +183,10 @@ export default function HomePage() {
                   ? "tab active"
                   : "tab"
               }
-              onClick={() => setActiveTab("upload")}
+              onClick={() => {
+                setActiveTab("upload");
+                setResult(null);
+              }}
             >
               ⬆ Upload File
             </button>
@@ -134,7 +197,10 @@ export default function HomePage() {
                   ? "tab active"
                   : "tab"
               }
-              onClick={() => setActiveTab("record")}
+              onClick={() => {
+                setActiveTab("record");
+                setResult(null);
+              }}
             >
               🎤 Rekam Suara
             </button>
@@ -147,7 +213,7 @@ export default function HomePage() {
                 <div className="upload-icon">⇪</div>
 
                 <h3>
-                  Drag & drop file audio di sini
+                  {selectedFile ? selectedFile.name : "Drag & drop file audio di sini"}
                 </h3>
 
                 <p>atau</p>
@@ -158,6 +224,7 @@ export default function HomePage() {
                   <input
                     type="file"
                     accept="audio/*"
+                    onChange={handleFileChange}
                     hidden
                   />
                 </label>
@@ -168,8 +235,18 @@ export default function HomePage() {
                 </span>
               </div>
 
-              <button className="analyze-btn">
-                🔍 Analisis Sekarang
+              {audioURL && (
+                <div className="audio-player-wrapper" style={{ marginTop: '1rem' }}>
+                  <audio controls src={audioURL} className="audio-player" />
+                </div>
+              )}
+
+              <button 
+                className="analyze-btn" 
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || !selectedFile}
+              >
+                {isAnalyzing ? "⌛ Menganalisis..." : "🔍 Analisis Sekarang"}
               </button>
             </>
           )}
@@ -225,10 +302,51 @@ export default function HomePage() {
                 </span>
               </div>
 
-              <button className="analyze-btn">
-                🔍 Analisis Rekaman
+              <button 
+                className="analyze-btn" 
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || !audioURL}
+              >
+                {isAnalyzing ? "⌛ Menganalisis..." : "🔍 Analisis Rekaman"}
               </button>
             </>
+          )}
+
+          {/* RESULT DISPLAY */}
+          {result && (
+            <div className="result-card" style={{ 
+              marginTop: '2rem', 
+              padding: '1.5rem', 
+              borderRadius: '12px', 
+              backgroundColor: result.summary.prediction === 'real' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${result.summary.prediction === 'real' ? '#10b981' : '#ef4444'}`
+            }}>
+              <h3 style={{ color: result.summary.prediction === 'real' ? '#10b981' : '#ef4444', marginBottom: '0.5rem' }}>
+                Hasil Analisis: {result.summary.prediction.toUpperCase()}
+              </h3>
+              <p>Tingkat Kepercayaan: <strong>{result.summary.confidence.toFixed(2)}%</strong></p>
+              <div style={{ marginTop: '1rem', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                <strong>Analisis AI:</strong>
+                <p>
+                  {result.analysis?.analysis?.summary || result.analysis?.text || "Tidak ada analisis tersedia."}
+                </p>
+                
+                {result.analysis?.analysis?.recommendation && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <strong>Rekomendasi:</strong>
+                    <ul style={{ paddingLeft: '1.2rem', marginTop: '0.2rem' }}>
+                      {result.analysis.analysis.recommendation.map((rec: string, index: number) => (
+                        <li key={index}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <small style={{ color: '#6b7280', display: 'block', marginTop: '1rem' }}>
+                  Sumber: {result.analysis?.source || (result.analysis?.analysis ? "Gemini AI" : "Unknown")}
+                </small>
+              </div>
+            </div>
           )}
         </div>
       </section>
